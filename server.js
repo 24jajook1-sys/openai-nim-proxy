@@ -25,10 +25,10 @@ const MODEL_MAPPING = {
   'nemotron-253b': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
   'qwen3-coder-480b': 'qwen/qwen3-coder-480b-a35b-instruct',
   'kimi-k2': 'moonshotai/kimi-k2-instruct-0905',
-  'deepseek-v3.2': 'deepseek-ai/deepseek-v3.2',
+  'deepseek4': 'deepseek-ai/deepseek-v4-pro',
   'gpt-oss-120b': 'openai/gpt-oss-120b',
   'gpt-oss-20b': 'openai/gpt-oss-20b',
-  'glm5': 'z-ai/glm5'
+  'glm5.1': 'z-ai/glm-5.1'
 };
 
 // Per-model thinking configuration

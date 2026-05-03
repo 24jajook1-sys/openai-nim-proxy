@@ -12,15 +12,21 @@ const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.c
 const NIM_API_KEY = process.env.NIM_API_KEY;
 
 const MODEL_MAPPING = {
-  'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',
-  'gpt-4': 'meta/llama-3.1-70b-instruct',
-  'gpt-4-turbo': 'meta/llama-3.1-70b-instruct',
-  'gpt-4o': 'meta/llama-3.1-405b-instruct',
-  'claude-3-opus': 'meta/llama-3.1-405b-instruct',
-  'claude-3-sonnet': 'meta/llama-3.1-70b-instruct',
-  'gemini-pro': 'meta/llama-3.1-70b-instruct',
-  'deepseek-v4-pro': 'deepseek-ai/deepseek-v4-pro',
-  'glm-5': 'z-ai/glm-5.1'
+  'gpt-3.5-turbo': { model: 'meta/llama-3.1-8b-instruct' },
+  'gpt-4':         { model: 'meta/llama-3.1-70b-instruct' },
+  'gpt-4-turbo':   { model: 'meta/llama-3.1-70b-instruct' },
+  'gpt-4o':        { model: 'meta/llama-3.1-405b-instruct' },
+  'claude-3-opus':   { model: 'meta/llama-3.1-405b-instruct' },
+  'claude-3-sonnet': { model: 'meta/llama-3.1-70b-instruct' },
+  'gemini-pro':      { model: 'meta/llama-3.1-70b-instruct' },
+  'deepseek-v4-pro': {
+    model: 'deepseek-ai/deepseek-v4-pro',
+    extra_body: { chat_template_kwargs: { thinking: false } }
+  },
+  'glm-5': {
+    model: 'z-ai/glm-5.1',
+    extra_body: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
+  }
 };
 
 app.get('/health', (req, res) => {
@@ -68,14 +74,16 @@ app.get('/v1/models', (req, res) => {
 app.post('/v1/chat/completions', async (req, res) => {
   try {
     const { model, messages, temperature, max_tokens, stream } = req.body;
-    const nimModel = MODEL_MAPPING[model] || 'meta/llama-3.1-8b-instruct';
+    const mapped = MODEL_MAPPING[model] || { model: 'meta/llama-3.1-8b-instruct' };
 
     const nimRequest = {
-      model: nimModel,
+      model: mapped.model,
       messages: messages,
-      temperature: temperature || 0.6,
-      max_tokens: max_tokens || 1024,
-      stream: stream || false
+      temperature: temperature || 1,
+      top_p: req.body.top_p || 1,
+      max_tokens: max_tokens || 16384,
+      stream: stream || false,
+      ...(mapped.extra_body && { extra_body: mapped.extra_body })
     };
 
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {

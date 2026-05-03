@@ -42,7 +42,12 @@ const MODEL_THINKING_CONFIG = {
   'z-ai/glm5': { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } },
   'qwen/qwen3-next-80b-a3b-thinking': { chat_template_kwargs: { thinking: true } }
 };
-
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    service: 'OpenAI to NVIDIA NIM Proxy'
+  });
+});
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 

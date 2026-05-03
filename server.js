@@ -38,9 +38,9 @@ const MODEL_MAPPING = {
 
 // Per-model thinking configuration
 const MODEL_THINKING_CONFIG = {
-  'deepseek-ai/deepseek-v3.2': { chat_template_kwargs: { thinking: true } },
-  'z-ai/glm5': { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } },
-  'qwen/qwen3-next-80b-a3b-thinking': { chat_template_kwargs: { thinking: true } }
+  'deepseek-ai/deepseek-v4-pro': { chat_template_kwargs: { thinking: true } },
+  'z-ai/glm-5.1': { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } },
+  'nvidia/llama-3.1-nemotron-ultra-253b-v1': { chat_template_kwargs: { thinking: true } }
 };
 app.get('/', (req, res) => {
   res.json({ 

@@ -27,13 +27,23 @@ const ENABLE_THINKING_MODE = true; // Set to true to enable chat_template_kwargs
 
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
-  'nemotron-253b': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-  'qwen3-coder-480b': 'qwen/qwen3-coder-480b-a35b-instruct',
-  'kimi-k2': 'moonshotai/kimi-k2-instruct-0905',
-  'deepseek4': 'deepseek-ai/deepseek-v4-pro',
-  'gpt-oss-120b': 'openai/gpt-oss-120b',
-  'gpt-oss-20b': 'openai/gpt-oss-20b',
-  'glm5.1': 'z-ai/glm-5.1'
+  // Janitor AI standard names → NVIDIA models
+  'gpt-3.5-turbo':   'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  'gpt-4':           'qwen/qwen3-coder-480b-a35b-instruct',
+  'gpt-4-turbo':     'moonshotai/kimi-k2-instruct-0905',
+  'gpt-4o':          'openai/gpt-oss-120b',
+  'claude-3-opus':   'openai/gpt-oss-120b',
+  'claude-3-sonnet': 'openai/gpt-oss-20b',
+  'gemini-pro':      'z-ai/glm-5.1',
+
+  // Your custom names (kept)
+  'nemotron-253b':   'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  'qwen3-coder-480b':'qwen/qwen3-coder-480b-a35b-instruct',
+  'kimi-k2':         'moonshotai/kimi-k2-instruct-0905',
+  'deepseek4':       'deepseek-ai/deepseek-v4-pro',
+  'gpt-oss-120b':    'openai/gpt-oss-120b',
+  'gpt-oss-20b':     'openai/gpt-oss-20b',
+  'glm5.1':          'z-ai/glm-5.1'
 };
 
 // Per-model thinking configuration
@@ -109,9 +119,9 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     // Get per-model thinking config or fall back to default
-    const thinkingConfig = ENABLE_THINKING_MODE
-      ? (MODEL_THINKING_CONFIG[nimModel] || { chat_template_kwargs: { thinking: true } })
-      : undefined;
+   const thinkingConfig = ENABLE_THINKING_MODE
+  ? (MODEL_THINKING_CONFIG[nimModel] || undefined)
+  : undefined;
     
     // Transform OpenAI request to NIM format
     const nimRequest = {

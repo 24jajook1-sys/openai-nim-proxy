@@ -18,7 +18,9 @@ const MODEL_MAPPING = {
   'gpt-4o': 'meta/llama-3.1-405b-instruct',
   'claude-3-opus': 'meta/llama-3.1-405b-instruct',
   'claude-3-sonnet': 'meta/llama-3.1-70b-instruct',
-  'gemini-pro': 'meta/llama-3.1-70b-instruct'
+  'gemini-pro': 'meta/llama-3.1-70b-instruct',
+  'deepseek-v4-pro': 'deepseek-ai/deepseek-v4-pro',
+  'glm-5': 'z-ai/glm-5.1'
 };
 
 app.get('/health', (req, res) => {

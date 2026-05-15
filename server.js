@@ -26,7 +26,8 @@ const MODEL_MAPPING = {
   'glm-5': {
     model: 'z-ai/glm-5.1',
     extra_body: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
-  }
+  },
+  'minimax-m2.7': { model: 'minimaxai/minimax-m2.7' }
 };
 
 app.get('/health', (req, res) => {

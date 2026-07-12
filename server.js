@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.options('*', cors());
@@ -38,10 +38,12 @@ const MODEL_MAPPING = {
   'minimax-m2.7': { model: 'minimaxai/minimax-m3' }
 };
 
+// Root endpoint
 app.get('/', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', message: 'OpenAI NIM Proxy running' });
 });
 
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -51,8 +53,10 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint
 app.post('/debug', async (req, res) => {
   try {
+    console.log('Debug endpoint called');
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, {
       model: 'meta/llama-3.1-8b-instruct',
       messages: [{ role: 'user', content: 'say hi' }],
@@ -65,6 +69,7 @@ app.post('/debug', async (req, res) => {
     });
     res.json({ success: true, response: response.data });
   } catch (err) {
+    console.error('Debug error:', err.message);
     res.status(500).json({
       success: false,
       status: err.response?.status,
@@ -74,18 +79,26 @@ app.post('/debug', async (req, res) => {
   }
 });
 
+// List available models
 app.get('/v1/models', (req, res) => {
-  const models = Object.keys(MODEL_MAPPING).map(model => ({
-    id: model,
-    object: 'model',
-    created: Date.now(),
-    owned_by: 'nvidia-nim-proxy'
-  }));
-  res.json({ object: 'list', data: models });
+  try {
+    const models = Object.keys(MODEL_MAPPING).map(model => ({
+      id: model,
+      object: 'model',
+      created: Date.now(),
+      owned_by: 'nvidia-nim-proxy'
+    }));
+    res.json({ object: 'list', data: models });
+  } catch (err) {
+    console.error('Models error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
+// Chat completions endpoint
 app.post('/v1/chat/completions', async (req, res) => {
   try {
+    console.log('Chat completion request received');
     const { model, messages, temperature, max_tokens, stream } = req.body;
 
     // Validate required fields
@@ -95,6 +108,16 @@ app.post('/v1/chat/completions', async (req, res) => {
           message: 'messages field is required and must be a non-empty array',
           type: 'invalid_request_error',
           code: 400
+        }
+      });
+    }
+
+    if (!NIM_API_KEY) {
+      return res.status(500).json({
+        error: {
+          message: 'NIM_API_KEY not configured on server',
+          type: 'server_error',
+          code: 500
         }
       });
     }
@@ -110,6 +133,8 @@ app.post('/v1/chat/completions', async (req, res) => {
       stream: stream || false,
       ...(mapped.extra_body && { extra_body: mapped.extra_body })
     };
+
+    console.log(`Forwarding to NIM API: ${mapped.model}`);
 
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
       headers: {
@@ -127,36 +152,69 @@ app.post('/v1/chat/completions', async (req, res) => {
       response.data.on('data', chunk => res.write(chunk));
       response.data.on('end', () => res.end());
       response.data.on('error', (err) => {
-        console.error('Stream error:', err);
+        console.error('Stream error:', err.message);
         res.end();
       });
     } else {
       const choices = response.data.choices || [];
-      res.json({
+      const responseBody = {
         id: `chatcmpl-${Date.now()}`,
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
         model: model,
         choices: choices.map(c => ({
           index: c.index,
-          message: { role: c.message?.role || 'assistant', content: c.message?.content || '' },
+          message: { 
+            role: c.message?.role || 'assistant', 
+            content: c.message?.content || '' 
+          },
           finish_reason: c.finish_reason
         })),
         usage: response.data.usage || {}
-      });
+      };
+      res.json(responseBody);
     }
   } catch (err) {
-    res.status(err.response?.status || 500).json({
+    console.error('Chat completion error:', err.message);
+    const statusCode = err.response?.status || 500;
+    res.status(statusCode).json({
       error: {
-        message: err.message,
+        message: err.message || 'Internal server error',
         type: 'invalid_request_error',
-        code: err.response?.status || 500
+        code: statusCode
       }
     });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Proxy running on port ${PORT}`);
-  console.log(`Key loaded: ${!!NIM_API_KEY}`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: {
+      message: err.message || 'Internal server error',
+      type: 'server_error',
+      code: 500
+    }
+  });
+});
+
+const server = app.listen(PORT, () => {
+  console.log(`\n✅ Proxy running on port ${PORT}`);
+  console.log(`🔑 API Key loaded: ${!!NIM_API_KEY}`);
+  console.log(`📡 NIM API Base: ${NIM_API_BASE}`);
+  console.log(`\n📝 Available endpoints:`);
+  console.log(`  GET  /health`);
+  console.log(`  GET  /v1/models`);
+  console.log(`  POST /v1/chat/completions`);
+  console.log(`\n`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });

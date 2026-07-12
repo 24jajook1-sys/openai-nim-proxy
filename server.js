@@ -5,13 +5,29 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({
+// Enhanced CORS configuration
+const corsOptions = {
   origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.options('*', cors());
+  methods: ['GET', 'POST', 'OPTIONS', 'HEAD', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'User-Agent', 'Accept'],
+  credentials: false,
+  maxAge: 86400
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '100mb' }));
+app.use(express.text({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  console.log('Origin:', req.get('origin'));
+  console.log('User-Agent:', req.get('user-agent'));
+  console.log('Content-Type:', req.get('content-type'));
+  next();
+});
 
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY = process.env.NIM_API_KEY;
@@ -50,13 +66,14 @@ app.get('/health', (req, res) => {
     service: 'OpenAI to NVIDIA NIM Proxy',
     key_loaded: !!NIM_API_KEY,
     key_preview: NIM_API_KEY ? NIM_API_KEY.slice(0, 10) + '...' : 'NOT SET',
-    port: PORT
+    port: PORT,
+    cors_enabled: true
   });
 });
 
 // Debug endpoint - logs incoming request
 app.post('/v1/debug/request', (req, res) => {
-  console.log('=== INCOMING REQUEST ===');
+  console.log('=== INCOMING REQUEST DEBUG ===');
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
   console.log('Body:', JSON.stringify(req.body, null, 2));
   console.log('========================');
@@ -126,13 +143,14 @@ app.post('/v1/chat/completions', async (req, res) => {
     console.log('Timestamp:', new Date().toISOString());
     console.log('Method: POST');
     console.log('Path: /v1/chat/completions');
-    console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('Full Body:', JSON.stringify(req.body, null, 2));
+    console.log('Authorization Header Present:', !!req.get('authorization'));
     
     const { model, messages, temperature, max_tokens, stream } = req.body;
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      console.error('Invalid messages field');
+      console.error('❌ Invalid messages field');
       return res.status(400).json({
         error: {
           message: 'messages field is required and must be a non-empty array',
@@ -143,7 +161,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     if (!NIM_API_KEY) {
-      console.error('NIM_API_KEY not set');
+      console.error('❌ NIM_API_KEY not set');
       return res.status(500).json({
         error: {
           message: 'NIM_API_KEY not configured on server',
@@ -154,7 +172,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     const mapped = MODEL_MAPPING[model] || { model: 'meta/llama-3.1-8b-instruct' };
-    console.log(`Model: ${model} -> ${mapped.model}`);
+    console.log(`✓ Model: ${model} -> ${mapped.model}`);
 
     const nimRequest = {
       model: mapped.model,
@@ -166,7 +184,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       ...(mapped.extra_body && { extra_body: mapped.extra_body })
     };
 
-    console.log(`Forwarding to NIM API: ${NIM_API_BASE}/chat/completions`);
+    console.log(`📡 Forwarding to NIM API: ${NIM_API_BASE}/chat/completions`);
 
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
       headers: {
@@ -204,11 +222,12 @@ app.post('/v1/chat/completions', async (req, res) => {
         })),
         usage: response.data.usage || {}
       };
-      console.log('Successfully sent response');
+      console.log('✅ Successfully sent response');
       res.json(responseBody);
     }
   } catch (err) {
-    console.error('Chat completion error:', err.message);
+    console.error('❌ Chat completion error:', err.message);
+    console.error('Error code:', err.code);
     const statusCode = err.response?.status || 500;
     res.status(statusCode).json({
       error: {
@@ -222,7 +241,7 @@ app.post('/v1/chat/completions', async (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  console.error('❌ Unhandled error:', err);
   res.status(500).json({
     error: {
       message: err.message || 'Internal server error',
@@ -243,6 +262,7 @@ const server = app.listen(PORT, () => {
   console.log(`  POST /v1/chat/completions`);
   console.log(`  POST /v1/debug/request (logs incoming requests)`);
   console.log(`  POST /debug (tests NIM API connection)`);
+  console.log(`\n✓ CORS enabled for all origins`);
   console.log(`\n`);
 });
 

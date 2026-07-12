@@ -49,7 +49,8 @@ app.get('/health', (req, res) => {
     status: 'ok',
     service: 'OpenAI to NVIDIA NIM Proxy',
     key_loaded: !!NIM_API_KEY,
-    key_preview: NIM_API_KEY ? NIM_API_KEY.slice(0, 10) + '...' : 'NOT SET'
+    key_preview: NIM_API_KEY ? NIM_API_KEY.slice(0, 10) + '...' : 'NOT SET',
+    port: PORT
   });
 });
 
@@ -65,7 +66,8 @@ app.post('/debug', async (req, res) => {
       headers: {
         'Authorization': `Bearer ${NIM_API_KEY}`,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 30000
     });
     res.json({ success: true, response: response.data });
   } catch (err) {
@@ -203,6 +205,7 @@ const server = app.listen(PORT, () => {
   console.log(`\n✅ Proxy running on port ${PORT}`);
   console.log(`🔑 API Key loaded: ${!!NIM_API_KEY}`);
   console.log(`📡 NIM API Base: ${NIM_API_BASE}`);
+  console.log(`🌐 Public URL: https://openai-nim-proxy-production-c734.up.railway.app:${PORT}`);
   console.log(`\n📝 Available endpoints:`);
   console.log(`  GET  /health`);
   console.log(`  GET  /v1/models`);

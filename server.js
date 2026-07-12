@@ -54,10 +54,32 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Debug endpoint
+// Debug endpoint - logs incoming request
+app.post('/v1/debug/request', (req, res) => {
+  console.log('=== INCOMING REQUEST ===');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('========================');
+  res.json({
+    received: true,
+    headers: req.headers,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test endpoint - makes a real API call
 app.post('/debug', async (req, res) => {
   try {
     console.log('Debug endpoint called');
+    if (!NIM_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'NIM_API_KEY not set',
+        key_loaded: false
+      });
+    }
+
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, {
       model: 'meta/llama-3.1-8b-instruct',
       messages: [{ role: 'user', content: 'say hi' }],
@@ -100,11 +122,17 @@ app.get('/v1/models', (req, res) => {
 // Chat completions endpoint
 app.post('/v1/chat/completions', async (req, res) => {
   try {
-    console.log('Chat completion request received');
+    console.log('\n=== CHAT COMPLETION REQUEST ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Method: POST');
+    console.log('Path: /v1/chat/completions');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
     const { model, messages, temperature, max_tokens, stream } = req.body;
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      console.error('Invalid messages field');
       return res.status(400).json({
         error: {
           message: 'messages field is required and must be a non-empty array',
@@ -115,6 +143,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     if (!NIM_API_KEY) {
+      console.error('NIM_API_KEY not set');
       return res.status(500).json({
         error: {
           message: 'NIM_API_KEY not configured on server',
@@ -125,6 +154,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     const mapped = MODEL_MAPPING[model] || { model: 'meta/llama-3.1-8b-instruct' };
+    console.log(`Model: ${model} -> ${mapped.model}`);
 
     const nimRequest = {
       model: mapped.model,
@@ -136,7 +166,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       ...(mapped.extra_body && { extra_body: mapped.extra_body })
     };
 
-    console.log(`Forwarding to NIM API: ${mapped.model}`);
+    console.log(`Forwarding to NIM API: ${NIM_API_BASE}/chat/completions`);
 
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
       headers: {
@@ -174,6 +204,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         })),
         usage: response.data.usage || {}
       };
+      console.log('Successfully sent response');
       res.json(responseBody);
     }
   } catch (err) {
@@ -205,11 +236,13 @@ const server = app.listen(PORT, () => {
   console.log(`\n✅ Proxy running on port ${PORT}`);
   console.log(`🔑 API Key loaded: ${!!NIM_API_KEY}`);
   console.log(`📡 NIM API Base: ${NIM_API_BASE}`);
-  console.log(`🌐 Public URL: https://openai-nim-proxy-production-c734.up.railway.app:${PORT}`);
+  console.log(`🌐 Public URL: https://openai-nim-proxy-production-c734.up.railway.app`);
   console.log(`\n📝 Available endpoints:`);
   console.log(`  GET  /health`);
   console.log(`  GET  /v1/models`);
   console.log(`  POST /v1/chat/completions`);
+  console.log(`  POST /v1/debug/request (logs incoming requests)`);
+  console.log(`  POST /debug (tests NIM API connection)`);
   console.log(`\n`);
 });
 

@@ -23,9 +23,9 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  console.log('Origin:', req.get('origin'));
-  console.log('User-Agent:', req.get('user-agent'));
-  console.log('Content-Type:', req.get('content-type'));
+  console.log('Origin:', req.get('origin') || 'none');
+  console.log('User-Agent:', req.get('user-agent') || 'none');
+  console.log('Content-Type:', req.get('content-type') || 'none');
   next();
 });
 
@@ -35,6 +35,8 @@ const NIM_API_KEY = process.env.NIM_API_KEY;
 // Validate API key on startup
 if (!NIM_API_KEY) {
   console.warn('WARNING: NIM_API_KEY is not set. API calls will fail.');
+} else {
+  console.log('✓ NIM_API_KEY is set');
 }
 
 const MODEL_MAPPING = {
@@ -71,6 +73,51 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test NIM API connection
+app.get('/test-nim', async (req, res) => {
+  try {
+    console.log('\n🧪 Testing NIM API connection...');
+    console.log(`Connecting to: ${NIM_API_BASE}/chat/completions`);
+    
+    if (!NIM_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'NIM_API_KEY not configured',
+        details: 'Set NIM_API_KEY environment variable'
+      });
+    }
+
+    const response = await axios.post(`${NIM_API_BASE}/chat/completions`, {
+      model: 'meta/llama-3.1-8b-instruct',
+      messages: [{ role: 'user', content: 'test' }],
+      max_tokens: 10
+    }, {
+      headers: {
+        'Authorization': `Bearer ${NIM_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000
+    });
+
+    console.log('✅ NIM API connection successful!');
+    res.json({
+      success: true,
+      message: 'NIM API is reachable and responding',
+      response_status: response.status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('❌ NIM API connection failed:', err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      error_code: err.code,
+      status: err.response?.status,
+      nim_error: err.response?.data
+    });
+  }
+});
+
 // Debug endpoint - logs incoming request
 app.post('/v1/debug/request', (req, res) => {
   console.log('=== INCOMING REQUEST DEBUG ===');
@@ -83,41 +130,6 @@ app.post('/v1/debug/request', (req, res) => {
     body: req.body,
     timestamp: new Date().toISOString()
   });
-});
-
-// Test endpoint - makes a real API call
-app.post('/debug', async (req, res) => {
-  try {
-    console.log('Debug endpoint called');
-    if (!NIM_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        error: 'NIM_API_KEY not set',
-        key_loaded: false
-      });
-    }
-
-    const response = await axios.post(`${NIM_API_BASE}/chat/completions`, {
-      model: 'meta/llama-3.1-8b-instruct',
-      messages: [{ role: 'user', content: 'say hi' }],
-      max_tokens: 5
-    }, {
-      headers: {
-        'Authorization': `Bearer ${NIM_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000
-    });
-    res.json({ success: true, response: response.data });
-  } catch (err) {
-    console.error('Debug error:', err.message);
-    res.status(500).json({
-      success: false,
-      status: err.response?.status,
-      error: err.response?.data || err.message,
-      key_preview: NIM_API_KEY ? NIM_API_KEY.slice(0, 10) + '...' : 'NOT SET'
-    });
-  }
 });
 
 // List available models
@@ -228,12 +240,14 @@ app.post('/v1/chat/completions', async (req, res) => {
   } catch (err) {
     console.error('❌ Chat completion error:', err.message);
     console.error('Error code:', err.code);
+    console.error('NIM API response:', err.response?.data);
     const statusCode = err.response?.status || 500;
     res.status(statusCode).json({
       error: {
         message: err.message || 'Internal server error',
         type: 'invalid_request_error',
-        code: statusCode
+        code: statusCode,
+        details: err.response?.data
       }
     });
   }
@@ -258,10 +272,10 @@ const server = app.listen(PORT, () => {
   console.log(`🌐 Public URL: https://openai-nim-proxy-production-c734.up.railway.app`);
   console.log(`\n📝 Available endpoints:`);
   console.log(`  GET  /health`);
+  console.log(`  GET  /test-nim (test NIM API connection)`);
   console.log(`  GET  /v1/models`);
   console.log(`  POST /v1/chat/completions`);
   console.log(`  POST /v1/debug/request (logs incoming requests)`);
-  console.log(`  POST /debug (tests NIM API connection)`);
   console.log(`\n✓ CORS enabled for all origins`);
   console.log(`\n`);
 });

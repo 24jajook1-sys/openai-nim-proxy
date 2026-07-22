@@ -26,10 +26,10 @@ const MODEL_MAPPING = {
   'gemini-pro':      { model: 'meta/llama-3.1-70b-instruct' },
   'deepseek-v4-pro': { model: 'deepseek-ai/deepseek-v4-pro' },
   'glm-5': {
-    model: 'z-ai/glm-5.1',
+    model: 'z-ai/glm-5.2',
     extra_body: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
   },
-  'minimax-m2.7':    { model: 'minimaxai/minimax-m2.7' },
+  'minimax-m2.7':    { model: 'minimaxai/minimax-m3' },
   'minimax-m3':      { model: 'minimaxai/minimax-m3' },
   'mistral-large':   { model: 'mistralai/mistral-large-3-675b-instruct-2512' },
   'llama4-maverick': { model: 'meta/llama-4-maverick-17b-128e-instruct' },

@@ -42,7 +42,7 @@ const MODEL_MAPPING = {
     extra_body: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
   },
   'minimax-m2.7':    { model: 'minimaxai/minimax-m2.7' },
-  'minimax-m3':      { model: 'minimaxai/minimax-m3' },
+  'minimax-m3':      { model: 'minimaxai/minimax-m3', forceNonStream: true }, // streaming cuts off empty on NIM — see handleChatCompletions
   'mistral-large':   { model: 'mistralai/mistral-large-3-675b-instruct-2512' },
   'llama4-maverick': { model: 'meta/llama-4-maverick-17b-128e-instruct' },
   'kimi-k2':         { model: 'moonshotai/kimi-k2.6' }
@@ -114,7 +114,7 @@ function checkProxyAuth(req, res, next) {
 // {baseURL}/chat/completions, and some (like what you just hit) POST
 // directly to {baseURL} with nothing appended. Handling all three removes
 // the guesswork.
-async function callNimWithRetry(nimRequest, retries = 2) {
+async function callNimWithRetry(nimRequest, retries = 4) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
@@ -128,8 +128,8 @@ async function callNimWithRetry(nimRequest, retries = 2) {
     } catch (err) {
       if (err.response?.status !== 429 || attempt === retries) throw err;
       const retryAfter = err.response.headers?.['retry-after'];
-      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : (attempt + 1) * 2000;
-      console.log(`429 from NIM (attempt ${attempt + 1}/${retries}), retrying in ${waitMs}ms`);
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : (attempt + 1) * 3000;
+      console.log(`429 from NIM for model ${nimRequest.model} (attempt ${attempt + 1}/${retries}), retrying in ${waitMs}ms`);
       await new Promise(r => setTimeout(r, waitMs));
     }
   }
@@ -139,6 +139,13 @@ async function handleChatCompletions(req, res) {
   try {
     const { model, messages, temperature, max_tokens, stream } = req.body;
     const mapped = MODEL_MAPPING[model] || { model: 'meta/llama-3.1-8b-instruct' };
+    const wantsStream = !!stream;
+    // Some NIM models (e.g. minimax-m3) have a documented bug where real
+    // streaming cuts off with no content. For those, request a normal
+    // completed response from NIM internally, then repackage it as a
+    // single-chunk SSE stream below so the client still gets the format
+    // it asked for.
+    const effectiveStream = wantsStream && !mapped.forceNonStream;
 
     const nimRequest = {
       model: mapped.model,
@@ -146,19 +153,38 @@ async function handleChatCompletions(req, res) {
       temperature: temperature || 1,
       top_p: req.body.top_p || 1,
       max_tokens: max_tokens || 16384,
-      stream: stream || false,
+      stream: effectiveStream,
       ...(mapped.extra_body && { extra_body: mapped.extra_body })
     };
 
     const response = await callNimWithRetry(nimRequest);
 
-    if (stream) {
+    if (effectiveStream) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       response.data.on('data', chunk => res.write(chunk));
       response.data.on('end', () => res.end());
       response.data.on('error', () => res.end());
+    } else if (wantsStream) {
+      // Client wanted streaming; we forced a completed request instead.
+      // Repackage the finished response as a single SSE chunk.
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      const choice = response.data.choices[0];
+      const chunkId = `chatcmpl-${Date.now()}`;
+      const created = Math.floor(Date.now() / 1000);
+      res.write(`data: ${JSON.stringify({
+        id: chunkId, object: 'chat.completion.chunk', created, model,
+        choices: [{ index: 0, delta: { role: 'assistant', content: choice.message.content }, finish_reason: null }]
+      })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        id: chunkId, object: 'chat.completion.chunk', created, model,
+        choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason || 'stop' }]
+      })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
     } else {
       res.json({
         id: `chatcmpl-${Date.now()}`,

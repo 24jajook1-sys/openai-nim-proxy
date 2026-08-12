@@ -39,7 +39,12 @@ const MODEL_MAPPING = {
   'deepseek-v4-pro': { model: 'deepseek-ai/deepseek-v4-pro' },
   'glm-5': {
     model: 'z-ai/glm-5.2',
-    extra_body: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
+    // Flattened directly into the request body below — NOT nested under a
+    // literal "extra_body" key. "extra_body" is an OpenAI *Python SDK*
+    // convenience that the SDK itself flattens before sending; NVIDIA's raw
+    // REST API has no such field and rejects it (400: Unsupported
+    // parameter(s): `extra_body`).
+    extraParams: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
   },
   'minimax-m2.7':    { model: 'minimaxai/minimax-m2.7' },
   'minimax-m3':      { model: 'minimaxai/minimax-m3', forceNonStream: true }, // streaming cuts off empty on NIM — see handleChatCompletions
@@ -154,7 +159,7 @@ async function handleChatCompletions(req, res) {
       top_p: req.body.top_p || 1,
       max_tokens: max_tokens || 16384,
       stream: effectiveStream,
-      ...(mapped.extra_body && { extra_body: mapped.extra_body })
+      ...(mapped.extraParams || {})
     };
 
     const response = await callNimWithRetry(nimRequest);

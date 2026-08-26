@@ -36,7 +36,7 @@ const MODEL_MAPPING = {
   'claude-3-opus':   { model: 'meta/llama-3.1-405b-instruct' },
   'claude-3-sonnet': { model: 'meta/llama-3.1-70b-instruct' },
   'gemini-pro':      { model: 'meta/llama-3.1-70b-instruct' },
-  'deepseek-v4-pro': { model: 'deepseek-ai/deepseek-v4-flash-0731' },
+  'deepseek-v4-pro': { model: 'deepseek-ai/deepseek-v4-flash-0731' , forceNonStream: true,extraParams: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false }}},
   'glm-5': {
     model: 'z-ai/glm-5.2',
     // Flattened directly into the request body below — NOT nested under a

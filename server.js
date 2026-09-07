@@ -50,7 +50,7 @@ const MODEL_MAPPING = {
   'minimax-m2.7':      { model: 'minimaxai/minimax-m3', forceNonStream: true }, // streaming cuts off empty on NIM — see handleChatCompletions
   'mistral-large':   { model: 'mistralai/mistral-large-3-675b-instruct-2512' },
   'llama4-maverick': { model: 'meta/llama-4-maverick-17b-128e-instruct' },
-  'kimi-k2':         { model: 'moonshotai/kimi-k2.6' }
+  'kimi':         { model: 'moonshotai/kimi-k3' }
 };
 
 app.get('/', (req, res) => {

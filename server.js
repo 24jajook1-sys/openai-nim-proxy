@@ -38,7 +38,7 @@ const MODEL_MAPPING = {
   'gemini-pro':      { model: 'meta/llama-3.1-70b-instruct' },
   'deepseek-v4-pro': { model: 'z-ai/glm-5.3-flash' , forceNonStream: true,extraParams: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false }}},
   'glm-5': {
-    model: 'z-ai/glm-5.3',
+    model: 'z-ai/glm-5.3-flash',
     // Flattened directly into the request body below — NOT nested under a
     // literal "extra_body" key. "extra_body" is an OpenAI *Python SDK*
     // convenience that the SDK itself flattens before sending; NVIDIA's raw

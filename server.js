@@ -47,7 +47,7 @@ const MODEL_MAPPING = {
     extraParams: { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } }
   },
   'step':    { model: 'stepfun-ai/step-3.7-flash' },
-  'minimax-m2.7':      { model: 'minimaxai/minimax-m3', forceNonStream: true }, // streaming cuts off empty on NIM — see handleChatCompletions
+  'minimax-m2.7':      { model: 'minimaxai/minimax-m3.1-flash', forceNonStream: true }, // streaming cuts off empty on NIM — see handleChatCompletions
   'mistral-large':   { model: 'mistralai/mistral-large-3-675b-instruct-2512' },
   'llama4-maverick': { model: 'meta/llama-4-maverick-17b-128e-instruct' },
   'kimi':         { model: 'moonshotai/kimi-k3' }
